@@ -132,13 +132,36 @@ class LRUKReplacer {
    */
   auto Size() -> size_t;
 
+  class FrameInfo {
+   public:
+    frame_id_t frame_id_;
+    std::list<size_t> record_time_;
+    bool is_evictable_{false};
+  };
+
+  void PrintPool();
+  void PrintFrameInfo(frame_id_t frame_id);
+
  private:
   // TODO(student): implement me! You can replace these member variables as you like.
   // Remove maybe_unused if you start using them.
-  [[maybe_unused]] size_t current_timestamp_{0};
-  [[maybe_unused]] size_t curr_size_{0};
-  [[maybe_unused]] size_t replacer_size_;
-  [[maybe_unused]] size_t k_;
+  size_t current_timestamp_{0};
+  size_t evictable_nums_{0};
+  size_t replacer_size_;
+  size_t k_;
+
+  // buffer pool存在的frame_id
+  std::unordered_map<frame_id_t, FrameInfo> frame_info_;
+  // History list
+  std::list<frame_id_t> history_list_;
+  // History hash map
+  std::unordered_map<frame_id_t, std::list<frame_id_t>::iterator> history_hash_map_;
+  // cache list
+  std::list<frame_id_t> cache_list_;
+  // cache hash map
+  std::unordered_map<frame_id_t, std::list<frame_id_t>::iterator> cache_hash_map_;
+
+  void CacheListInsert(frame_id_t frame_id);
   std::mutex latch_;
 };
 
