@@ -26,13 +26,11 @@ TEST(LRUKReplacerTest, SampleTest) {
   lru_replacer.RecordAccess(4);
   lru_replacer.RecordAccess(5);
   lru_replacer.RecordAccess(6);
-  lru_replacer.PrintPool();
   lru_replacer.SetEvictable(1, true);
   lru_replacer.SetEvictable(2, true);
   lru_replacer.SetEvictable(3, true);
   lru_replacer.SetEvictable(4, true);
   lru_replacer.SetEvictable(5, true);
-  lru_replacer.PrintPool();
   lru_replacer.SetEvictable(6, false);
   ASSERT_EQ(5, lru_replacer.Size());
 
@@ -40,7 +38,6 @@ TEST(LRUKReplacerTest, SampleTest) {
   // All other frames have max backward k-dist. The order of eviction is [2,3,4,5,1].
   lru_replacer.RecordAccess(1);
 
-  lru_replacer.PrintPool();
   // Scenario: Evict three pages from the replacer. Elements with max k-distance should be popped
   // first based on LRU.
   int value;

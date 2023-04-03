@@ -134,13 +134,10 @@ class LRUKReplacer {
 
   class FrameInfo {
    public:
-    frame_id_t frame_id_;
+    page_id_t frame_id_;
     std::list<size_t> record_time_;
     bool is_evictable_{false};
   };
-
-  void PrintPool();
-  void PrintFrameInfo(frame_id_t frame_id);
 
  private:
   // TODO(student): implement me! You can replace these member variables as you like.
@@ -149,7 +146,6 @@ class LRUKReplacer {
   size_t evictable_nums_{0};
   size_t replacer_size_;
   size_t k_;
-
   // buffer pool存在的frame_id
   std::unordered_map<frame_id_t, FrameInfo> frame_info_;
   // History list
@@ -160,7 +156,6 @@ class LRUKReplacer {
   std::list<frame_id_t> cache_list_;
   // cache hash map
   std::unordered_map<frame_id_t, std::list<frame_id_t>::iterator> cache_hash_map_;
-
   void CacheListInsert(frame_id_t frame_id);
   std::mutex latch_;
 };
