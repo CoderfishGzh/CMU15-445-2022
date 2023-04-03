@@ -23,7 +23,7 @@ namespace bustub {
 
 // NOLINTNEXTLINE
 // Check whether pages containing terminal characters can be recovered
-TEST(BufferPoolManagerInstanceTest, DISABLED_BinaryDataTest) {
+TEST(BufferPoolManagerInstanceTest, BinaryDataTest) {
   const std::string db_name = "test.db";
   const size_t buffer_pool_size = 10;
   const size_t k = 5;
@@ -89,7 +89,7 @@ TEST(BufferPoolManagerInstanceTest, DISABLED_BinaryDataTest) {
 }
 
 // NOLINTNEXTLINE
-TEST(BufferPoolManagerInstanceTest, DISABLED_SampleTest) {
+TEST(BufferPoolManagerInstanceTest, SampleTest) {
   const std::string db_name = "test.db";
   const size_t buffer_pool_size = 10;
   const size_t k = 5;
@@ -123,6 +123,7 @@ TEST(BufferPoolManagerInstanceTest, DISABLED_SampleTest) {
   for (int i = 0; i < 5; ++i) {
     EXPECT_EQ(true, bpm->UnpinPage(i, true));
   }
+
   for (int i = 0; i < 4; ++i) {
     EXPECT_NE(nullptr, bpm->NewPage(&page_id_temp));
   }
@@ -141,6 +142,134 @@ TEST(BufferPoolManagerInstanceTest, DISABLED_SampleTest) {
   disk_manager->ShutDown();
   remove("test.db");
 
+  delete bpm;
+  delete disk_manager;
+}
+
+TEST(BufferPoolManagerInstanceTest, FetchPage) {
+  page_id_t temp_page_id;
+  auto *disk_manager = new DiskManager("test.db");
+  auto *bpm = new BufferPoolManagerInstance(10, disk_manager, 5);
+
+  std::vector<Page *> pages;
+  std::vector<page_id_t> page_ids;
+  std::vector<std::string> content;
+
+  for (int i = 0; i < 10; ++i) {
+    auto *new_page = bpm->NewPage(&temp_page_id);
+    ASSERT_NE(nullptr, new_page);
+    // 向page写入数据
+    strcpy(new_page->GetData(), std::to_string(i).c_str());  // NOLINT
+    pages.push_back(new_page);
+    page_ids.push_back(temp_page_id);
+    content.push_back(std::to_string(i));
+  }
+
+  for (int i = 0; i < 10; ++i) {
+    auto *page = bpm->FetchPage(page_ids[i]);
+    ASSERT_NE(nullptr, page);
+    ASSERT_EQ(pages[i], page);
+    ASSERT_EQ(0, std::strcmp(std::to_string(i).c_str(), (page->GetData())));
+    ASSERT_EQ(1, bpm->UnpinPage(page_ids[i], true));
+    ASSERT_EQ(1, bpm->UnpinPage(page_ids[i], true));
+    bpm->FlushPage(page_ids[i]);
+  }
+
+  // 所有的page： pin = 0, is_dirty = true
+  // page5： pin = 0, is_dirty = true
+  std::cout << "=========" << std::endl;
+  std::cout << "page5: pin = " << pages[5]->GetPinCount() << " is_dirty = " << pages[5]->IsDirty()
+            << " data = " << pages[5]->GetData() << std::endl;
+  std::cout << "=========" << std::endl;
+  std::vector<Page *> new_pages;
+  for (int i = 0; i < 10; ++i) {
+    auto *new_page = bpm->NewPage(&temp_page_id);
+    new_pages.push_back(new_page);
+    ASSERT_NE(nullptr, new_page);
+    bpm->UnpinPage(temp_page_id, true);
+  }
+
+  std::cout << "=========" << std::endl;
+  std::cout << "new pages: pin = " << new_pages[0]->GetPinCount() << " is_dirty = " << new_pages[0]->IsDirty()
+            << " data = " << new_pages[0]->GetData() << " page id: " << new_pages[0]->GetPageId() << std::endl;
+  std::cout << "=========" << std::endl;
+  std::cout << "pages_ids[5] = " << page_ids[5] << std::endl;
+  for (int i = 0; i < 10; ++i) {
+    auto *page = bpm->FetchPage(page_ids[i]);
+    ASSERT_NE(nullptr, page);
+  }
+  // page5: pin = 1, is_dirty = true
+  std::cout << "=========" << std::endl;
+  std::cout << "page5: pin = " << pages[5]->GetPinCount() << " is_dirty = " << pages[5]->IsDirty()
+            << " data = " << pages[5]->GetData() << std::endl;
+  std::cout << "=========" << std::endl;
+  ASSERT_EQ(1, bpm->UnpinPage(page_ids[4], true));
+  auto *new_page = bpm->NewPage(&temp_page_id);
+  ASSERT_NE(nullptr, new_page);
+  ASSERT_EQ(nullptr, bpm->FetchPage(page_ids[4]));
+
+  // Check Clock
+  auto *page5 = bpm->FetchPage(page_ids[5]);
+  auto *page6 = bpm->FetchPage(page_ids[6]);
+  auto *page7 = bpm->FetchPage(page_ids[7]);
+  ASSERT_NE(nullptr, page5);
+  ASSERT_NE(nullptr, page6);
+  ASSERT_NE(nullptr, page7);
+  strcpy(page5->GetData(), "updatedpage5");  // NOLINT
+  strcpy(page6->GetData(), "updatedpage6");  // NOLINT
+  strcpy(page7->GetData(), "updatedpage7");  // NOLINT
+
+  ASSERT_EQ(1, bpm->UnpinPage(page_ids[5], false));
+  ASSERT_EQ(1, bpm->UnpinPage(page_ids[6], false));
+  ASSERT_EQ(1, bpm->UnpinPage(page_ids[7], false));
+
+  ASSERT_EQ(1, bpm->UnpinPage(page_ids[5], false));
+  ASSERT_EQ(1, bpm->UnpinPage(page_ids[6], false));
+  ASSERT_EQ(1, bpm->UnpinPage(page_ids[7], false));
+
+  // page5 would be evicted.
+  new_page = bpm->NewPage(&temp_page_id);
+  ASSERT_NE(nullptr, new_page);
+  std::cout << "page id: " << new_page->GetPageId() << " page data : " << new_page->GetData() << std::endl;
+  // page6 would be evicted.
+  std::cout << "fetch page_id: " << page_ids[5] << std::endl;
+  page5 = bpm->FetchPage(page_ids[5]);
+  std::cout << "page id: " << page5->GetPageId() << " page data : " << page5->GetData() << std::endl;
+  ASSERT_NE(nullptr, page5);
+  ASSERT_EQ(0, std::strcmp("5", (page5->GetData())));
+  page7 = bpm->FetchPage(page_ids[7]);
+  ASSERT_NE(nullptr, page7);
+  ASSERT_EQ(0, std::strcmp("updatedpage7", (page7->GetData())));
+  // All pages pinned
+  ASSERT_EQ(nullptr, bpm->FetchPage(page_ids[6]));
+  bpm->UnpinPage(temp_page_id, false);
+  page6 = bpm->FetchPage(page_ids[6]);
+  ASSERT_NE(nullptr, page6);
+  ASSERT_EQ(0, std::strcmp("6", page6->GetData()));
+
+  strcpy(page6->GetData(), "updatedpage6");  // NOLINT
+
+  // Remove from LRU and update pin_count on fetch
+  new_page = bpm->NewPage(&temp_page_id);
+  ASSERT_EQ(nullptr, new_page);
+
+  ASSERT_EQ(1, bpm->UnpinPage(page_ids[7], false));
+  ASSERT_EQ(1, bpm->UnpinPage(page_ids[6], false));
+
+  new_page = bpm->NewPage(&temp_page_id);
+  ASSERT_NE(nullptr, new_page);
+  page6 = bpm->FetchPage(page_ids[6]);
+  ASSERT_NE(nullptr, page6);
+  ASSERT_EQ(0, std::strcmp("updatedpage6", page6->GetData()));
+  page7 = bpm->FetchPage(page_ids[7]);
+  ASSERT_EQ(nullptr, page7);
+  bpm->UnpinPage(temp_page_id, false);
+  page7 = bpm->FetchPage(page_ids[7]);
+  ASSERT_NE(nullptr, page7);
+  ASSERT_EQ(0, std::strcmp("7", (page7->GetData())));
+
+  remove("test.db");
+  remove("test.log");
   delete bpm;
   delete disk_manager;
 }

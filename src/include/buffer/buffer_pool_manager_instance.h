@@ -141,8 +141,10 @@ class BufferPoolManagerInstance : public BufferPoolManager {
   auto DeletePgImp(page_id_t page_id) -> bool override;
 
   /** Number of pages in the buffer pool. */
+  // buffer poll 最大缓存的page数量
   const size_t pool_size_;
   /** The next page id to be allocated  */
+  // 全局递增的id指待page
   std::atomic<page_id_t> next_page_id_ = 0;
   /** Bucket size for the extendible hash table */
   const size_t bucket_size_ = 4;
@@ -156,8 +158,10 @@ class BufferPoolManagerInstance : public BufferPoolManager {
   /** Page table for keeping track of buffer pool pages. */
   ExtendibleHashTable<page_id_t, frame_id_t> *page_table_;
   /** Replacer to find unpinned pages for replacement. */
+  // 淘汰器，用来记录frame的情况，判断那个frame上的page应该被淘汰
   LRUKReplacer *replacer_;
   /** List of free frames that don't have any pages on them. */
+  // frame_id 对应 pages_的下标
   std::list<frame_id_t> free_list_;
   /** This latch protects shared data structures. We recommend updating this comment to describe what it protects. */
   std::mutex latch_;
