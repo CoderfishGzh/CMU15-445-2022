@@ -34,7 +34,7 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::Init(page_id_t page_id, page_id_t parent_id, in
 
   this->SetPageId(page_id);
   this->SetParentPageId(parent_id);
-  this->SetNextPageId(INVALID_PAGE_ID); /*这个地方是否正确呢？*/
+  this->SetNextPageId(INVALID_PAGE_ID);
 
   this->SetMaxSize(max_size);
 }
@@ -67,18 +67,11 @@ INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveHalfTo(BPlusTreeLeafPage *recipient) {
   int start_split_indx = GetMinSize();
   SetSize(start_split_indx);
-  /*0 1    2 3 4
-   * 一共5个元素 maxsize=5 那么这个时候要移动的数据是2到5之间的
-   * 0 1 2 3
-   * 4  2
-   * */
-  /*modify:*/
   recipient->CopyNFrom(array_ + start_split_indx, GetMaxSize() - start_split_indx);
 }
 
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::CopyNFrom(MappingType *items, int size) {
-  /*把前一半剩下的数据加在，另一个页面的末尾*/
   std::copy(items, items + size, array_ + GetSize());
   IncreaseSize(size);
 }

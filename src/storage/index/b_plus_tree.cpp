@@ -69,12 +69,9 @@ auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result
  */
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transaction *transaction) -> bool {
-  // 先对root上写锁
   root_page_id_latch_.WLock();
-  // 设置后面解锁的终止条件
   transaction->AddIntoPageSet(nullptr);
   if (IsEmpty()) {
-    // B+当前为空，创建一颗新树
     StartNewTree(key, value);
     ReleaseLatchFromQueue(transaction);
     return true;
@@ -84,12 +81,10 @@ auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transact
 
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::StartNewTree(const KeyType &key, const ValueType &value) {
-  // 申请新页面
   auto buffer_page = buffer_pool_manager_->NewPage(&root_page_id_);
   if (buffer_page == nullptr) {
     throw Exception(ExceptionType::OUT_OF_MEMORY, "Cannot allocate new page");
   }
-  // 单一的root节点 必然是叶子节点
   auto bplus_page = reinterpret_cast<LeafPage *>(buffer_page->GetData());
   bplus_page->Init(root_page_id_, INVALID_PAGE_ID, leaf_max_size_);
   bplus_page->Insert(key, value, comparator_);
@@ -167,7 +162,6 @@ void BPLUSTREE_TYPE::InsertIntoParent(BPlusTreePage *old_node, const KeyType &ke
     buffer_pool_manager_->UnpinPage(parent_page->GetPageId(), true);
     return;
   }
-  // 因为internal page没有预留空家，所以要先创建一个足够插入新节点的空间
   auto *mem = new char[INTERNAL_PAGE_HEADER_SIZE + sizeof(MappingType) * (parent_node->GetSize() + 1)];
   auto *copy_parent_node = reinterpret_cast<InternalPage *>(mem);
   std::memcpy(mem, parent_page->GetData(), INTERNAL_PAGE_HEADER_SIZE + sizeof(MappingType) * (parent_node->GetSize()));
@@ -234,7 +228,6 @@ void BPLUSTREE_TYPE::Remove(const KeyType &key, Transaction *transaction) {
   auto leaf_page = FindLeaf(key, Operation::DELETE, transaction);
   auto *node = reinterpret_cast<LeafPage *>(leaf_page->GetData());
 
-  // 没有找到要删除的key
   if (node->GetSize() == node->RemoveAndDeleteRecord(key, comparator_)) {
     ReleaseLatchFromQueue(transaction);
     leaf_page->WUnlatch();
@@ -269,15 +262,11 @@ auto BPLUSTREE_TYPE::CoalesceOrRedistribute(N *node, Transaction *transaction) -
     return false;
   }
 
-  // 此时node的大小不符合B+树的规定，需要进行合并或者重组
-
   auto parent_page = buffer_pool_manager_->FetchPage(node->GetParentPageId());
   auto *parent_node = reinterpret_cast<InternalPage *>(parent_page->GetData());
-  // 拿到该node在page node中的下标位置
   auto idx = parent_node->ValueIndex(node->GetPageId());
 
   if (idx > 0) {
-    // 该node前面有一个兄弟节点，叫N`
     auto sibling_page = buffer_pool_manager_->FetchPage(parent_node->ValueAt(idx - 1));
     sibling_page->WLatch();
     N *sibling_node = reinterpret_cast<N *>(sibling_page->GetData());
@@ -436,12 +425,11 @@ auto BPLUSTREE_TYPE::FindLeaf(const KeyType &key, Operation operation, Transacti
     page->RLatch();
   } else {
     page->WLatch();
+    // 这里要保证根不被替换，才能解锁
     if (operation == Operation::DELETE && node->GetSize() > 2) {
       ReleaseLatchFromQueue(transaction);
     }
-    // 插入解锁 lock path路径， 判断条件： 能直接插入到node中
-    // - leafPage： nodeSize < MaxSize - 1
-    // - internalPage: nodeSize < MaxSize
+    // 页节点没没装满，最大装n-1
     if (operation == Operation::INSERT && node->IsLeafPage() && node->GetSize() < node->GetMaxSize() - 1) {
       ReleaseLatchFromQueue(transaction);
     }

@@ -20,9 +20,10 @@
 #include <list>
 #include <memory>
 #include <mutex>  // NOLINT
+#include <set>
+#include <unordered_set>
 #include <utility>
 #include <vector>
-
 #include "container/hash/hash_table.h"
 
 namespace bustub {
@@ -68,14 +69,22 @@ class ExtendibleHashTable : public HashTable<K, V> {
    * TODO(P1): Add implementation
    *
    * @brief Find the value associated with the given key.
-   *
-   * Use IndexOf(key) to find the directory index the key hashes to.
-   *
    * @param key The key to be searched.
    * @param[out] value The value associated with the key.
    * @return True if the key is found, false otherwise.
    */
   auto Find(const K &key, V &value) -> bool override;
+
+  /**
+   *
+   * TODO(P1): Add implementation
+   *
+   * @brief Given the key, remove the corresponding key-value pair in the hash table.
+   * Shrink & Combination is not required for this project
+   * @param key The key to be deleted.
+   * @return True if the key exists, false otherwise.
+   */
+  auto Remove(const K &key) -> bool override;
 
   /**
    *
@@ -95,17 +104,6 @@ class ExtendibleHashTable : public HashTable<K, V> {
   void Insert(const K &key, const V &value) override;
 
   /**
-   *
-   * TODO(P1): Add implementation
-   *
-   * @brief Given the key, remove the corresponding key-value pair in the hash table.
-   * Shrink & Combination is not required for this project
-   * @param key The key to be deleted.
-   * @return True if the key exists, false otherwise.
-   */
-  auto Remove(const K &key) -> bool override;
-
-  /**
    * Bucket class for each hash table bucket that the directory points to.
    */
   class Bucket {
@@ -116,10 +114,19 @@ class ExtendibleHashTable : public HashTable<K, V> {
     inline auto IsFull() const -> bool { return list_.size() == size_; }
 
     /** @brief Get the local depth of the bucket. */
-    inline auto GetDepth() const -> int { return depth_; }
+    inline auto GetDepth() const -> int {
+      inner_latch_.lock();
+      int temp = depth_;
+      inner_latch_.unlock();
+      return temp;
+    }
 
     /** @brief Increment the local depth of a bucket. */
-    inline void IncrementDepth() { depth_++; }
+    inline void IncrementDepth() {
+      inner_latch_.lock();
+      depth_++;
+      inner_latch_.unlock();
+    }
 
     inline auto GetItems() -> std::list<std::pair<K, V>> & { return list_; }
 
@@ -156,34 +163,32 @@ class ExtendibleHashTable : public HashTable<K, V> {
      * @return True if the key-value pair is inserted, false otherwise.
      */
     auto Insert(const K &key, const V &value) -> bool;
-
-    auto Update(const K &key, const V &value) -> bool;
+    void ClearList() { list_.clear(); }
+    void Replace(const K &key, const V &value) {
+      for (auto &x : list_) {
+        if (x.first == key) {
+          x.second = value;
+        }
+      }
+    }
 
    private:
     // TODO(student): You may add additional private members and helper functions
     size_t size_;
     int depth_;
     std::list<std::pair<K, V>> list_;
+    mutable std::mutex inner_latch_;
   };
 
  private:
-  // TODO(student): You may add additional private members and helper functions and remove the ones
-  // you don't need.
-
-  int global_depth_{0};  // The global depth of the directory
-  size_t bucket_size_;   // The size of a bucket
-  int num_buckets_{1};   // The number of buckets in the hash table
+  // TODO(student): You may add additional private members and helper functions
+  int global_depth_;    // The global depth of the directory
+  size_t bucket_size_;  // The size of a bucket
+  int num_buckets_;     // The number of buckets in the hash table
   mutable std::mutex latch_;
   std::vector<std::shared_ptr<Bucket>> dir_;  // The directory of the hash table
-
-  // The following functions are completely optional, you can delete them if you have your own ideas.
-
-  /**
-   * @brief Redistribute the kv pairs in a full bucket.
-   * @param bucket The bucket to be redistributed.
-   */
-  auto RedistributeBucket(std::shared_ptr<Bucket> bucket) -> void;
-
+  std::set<K> exist_;
+  mutable std::mutex mutex_;
   /*****************************************************************
    * Must acquire latch_ first before calling the below functions. *
    *****************************************************************/
@@ -194,7 +199,6 @@ class ExtendibleHashTable : public HashTable<K, V> {
    * @return The entry index in the directory.
    */
   auto IndexOf(const K &key) -> size_t;
-
   auto GetGlobalDepthInternal() const -> int;
   auto GetLocalDepthInternal(int dir_index) const -> int;
   auto GetNumBucketsInternal() const -> int;
