@@ -32,7 +32,12 @@ INDEXITERATOR_TYPE::~IndexIterator() {
 
 INDEX_TEMPLATE_ARGUMENTS
 auto INDEXITERATOR_TYPE::IsEnd() -> bool {
-  return leaf_->GetNextPageId() == INVALID_PAGE_ID && index_ == leaf_->GetSize();
+  if(leaf_->GetNextPageId() == INVALID_PAGE_ID) {
+    if(index_ == leaf_->GetSize()) {
+      return true;
+    }
+  }
+  return false;
 }
 
 INDEX_TEMPLATE_ARGUMENTS
