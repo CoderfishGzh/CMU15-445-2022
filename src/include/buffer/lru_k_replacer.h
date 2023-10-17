@@ -12,10 +12,13 @@
 
 #pragma once
 
+#include <algorithm>
 #include <limits>
 #include <list>
 #include <mutex>  // NOLINT
+#include <queue>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "common/config.h"
@@ -61,8 +64,8 @@ class LRUKReplacer {
    * that are marked as 'evictable' are candidates for eviction.
    *
    * A frame with less than k historical references is given +inf as its backward k-distance.
-   * If multiple frames have inf backward k-distance, then evict the frame with the earliest
-   * timestamp overall.
+   * If multiple frames have inf backward k-distance, then evict frame with earliest timestamp
+   * based on LRU.
    *
    * Successful eviction of a frame should decrement the size of replacer and remove the frame's
    * access history.
@@ -132,32 +135,19 @@ class LRUKReplacer {
    */
   auto Size() -> size_t;
 
-  class FrameInfo {
-   public:
-    page_id_t frame_id_;
-    std::list<size_t> record_time_;
-    bool is_evictable_{false};
-  };
-
  private:
   // TODO(student): implement me! You can replace these member variables as you like.
   // Remove maybe_unused if you start using them.
-  size_t current_timestamp_{0};
-  size_t evictable_nums_{0};
   size_t replacer_size_;
   size_t k_;
-  // buffer pool存在的frame_id
-  std::unordered_map<frame_id_t, FrameInfo> frame_info_;
-  // History list
-  std::list<frame_id_t> history_list_;
-  // History hash map
-  std::unordered_map<frame_id_t, std::list<frame_id_t>::iterator> history_hash_map_;
-  // cache list
-  std::list<frame_id_t> cache_list_;
-  // cache hash map
-  std::unordered_map<frame_id_t, std::list<frame_id_t>::iterator> cache_hash_map_;
-  void CacheListInsert(frame_id_t frame_id);
+  size_t current_size_;
+  std::vector<bool> is_accessible_;
   std::mutex latch_;
+  std::unordered_map<int, size_t> use_count_;
+  std::list<frame_id_t> history_list_;
+  std::unordered_map<frame_id_t, std::list<int>::iterator> history_map_;
+  std::list<frame_id_t> cache_list_;
+  std::unordered_map<frame_id_t, std::list<int>::iterator> cache_map_;
 };
 
 }  // namespace bustub
