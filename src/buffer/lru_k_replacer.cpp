@@ -19,6 +19,7 @@ LRUKReplacer::LRUKReplacer(size_t num_frames, size_t k) : replacer_size_(num_fra
   current_size_ = 0;
 }
 
+// 驱逐frame
 auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
   std::lock_guard<std::mutex> guard(latch_);
   // 1. 先驱逐history_list
@@ -42,6 +43,7 @@ auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
     history_list_.erase(it);
     return true;
   }
+  // 如果history list没有能够删除的frame，则删除cache上的内容
   it = cache_list_.end();
   while (it != cache_list_.begin()) {
     it--;
@@ -59,6 +61,7 @@ auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
   return false;
 }
 
+// 访问frame
 void LRUKReplacer::RecordAccess(frame_id_t frame_id) {
   // invalid
   std::lock_guard<std::mutex> guard(latch_);
@@ -91,6 +94,7 @@ void LRUKReplacer::RecordAccess(frame_id_t frame_id) {
   }
 }
 
+// 设置是否能被删除
 void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
   // invalid
   std::lock_guard<std::mutex> guard(latch_);

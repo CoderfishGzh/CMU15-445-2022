@@ -111,6 +111,7 @@ template <typename K, typename V>
 void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
   std::lock_guard<std::mutex> guard(latch_);
 
+  // 满了的情况： 需要进行扩容
   while (dir_[IndexOf(key)]->IsFull()) {
     int id = IndexOf(key);
     auto target_bucket = dir_[id];
@@ -120,12 +121,13 @@ void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
       // 1. 局部深度等于全局深度：先扩容
       global_depth_++;
       int capacity = dir_.size();
+      //  双倍扩容
       dir_.resize(capacity << 1);
       for (int idx = 0; idx < capacity; idx++) {
         dir_[idx + capacity] = dir_[idx];
       }
     }
-    // 分裂
+    // 分裂 如 localDepth = 1， 1 << localDepth = 10
     int mask = 1 << target_bucket->GetDepth();
     auto zero_bucket = std::make_shared<Bucket>(bucket_size_, target_bucket->GetDepth() + 1);
     auto one_bucket = std::make_shared<Bucket>(bucket_size_, target_bucket->GetDepth() + 1);
@@ -137,9 +139,9 @@ void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
         zero_bucket->Insert(item.first, item.second);
       }
     }
-
+    // 重定向桶指针, 仅需要比较新的位0还是1
     for (size_t i = 0; i < dir_.size(); i++) {
-      if (dir_[i] == target_bucket) {  // 这是目标桶，因为是2倍扩容，并且是相同内容，所以这个条件会触发两次
+      if (dir_[i] == target_bucket) {
         if ((i & mask) != 0U) {
           dir_[i] = one_bucket;
         } else {
@@ -149,11 +151,11 @@ void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
     }
   }
 
-  // 桶没满
+  // 桶没满的情况：正常插入
   auto index = IndexOf(key);
   auto target_bucket = dir_[index];
 
-  // 更新
+  // 存在则更新
   for (auto &item : target_bucket->GetItems()) {
     if (item.first == key) {
       item.second = value;
